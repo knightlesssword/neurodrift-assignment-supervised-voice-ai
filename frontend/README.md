@@ -33,6 +33,7 @@ server, which this PoC backend does not provide — keep the proxy instead.
 |---|---|---|
 | list/create agents | `GET /agents`, `POST /agents {name,system_prompt,voice,model}` | `{id,…}` |
 | start call | `POST /calls {agent_id}` | `{call_id,room,token,url,status,agent_dispatched}` |
+| delete agent | `DELETE /agents/{id}` | `204`, `404`, or `409` while live calls reference it |
 | supervisor join | `POST /calls/{id}/supervisor-token` | `{room,token,url}` (hidden, data-ok) |
 | end + results | `POST /calls/{id}/end`, `GET /calls/{id}` | `{status,transcript,compliance,latency}` |
 
