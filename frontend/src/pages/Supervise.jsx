@@ -85,6 +85,7 @@ export default function Supervise() {
       <p className="status">{status}</p>
       {error && <p className="error">{error}</p>}
       <h3>Whisper (private guidance)</h3>
+      <p className="muted">Applies to the agent's <b>next</b> reply — send it <b>before</b> the customer asks the question. Guidance sent mid-generation takes effect on the following turn.</p>
       <div className="row">
         <input value={whisper} onChange={e => setWhisper(e.target.value)} placeholder="e.g. offer a 10% discount" size="44" disabled={!joined} />
         <button onClick={onSend} disabled={!joined || !whisper.trim()}>Send whisper</button>

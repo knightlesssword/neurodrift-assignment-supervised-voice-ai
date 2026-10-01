@@ -56,11 +56,12 @@ export default function Call() {
       const id = callRef.current;
       if (roomRef.current) await roomRef.current.disconnect();
       setInCall(false);
-      setStatus('ending call…');
-      const body = await endCall(id);
-      setResult(body.compliance);
+      // End the call server-side (runs both compliance checks), then render
+      // ONLY the persisted GET result — single source of truth.
+      setStatus('ending call… (compliance checks run, may take ~30s)');
+      await endCall(id);
       const full = await getCall(id);
-      setResult({compliance: full.compliance, latency: full.latency, transcript: full.transcript});
+      setResult({compliance: full.compliance, latency: full.latency});
       setStatus(`ended ${id}`);
     } catch (e) { setError(String(e)); }
   }
@@ -87,6 +88,7 @@ export default function Call() {
       </div>
       <p className="status">{status}</p>
       {error && <p className="error">{error}</p>}
+      {inCall && <p className="muted">Call is live — navigating away (e.g. to Supervise) disconnects this page. Use a second browser tab/window for the supervisor, per the two-page demo flow.</p>}
       <h3>Live transcript</h3>
       <Transcript lines={lines} />
       <audio ref={audioRef} autoPlay />
@@ -96,8 +98,9 @@ export default function Call() {
 }
 
 function CallResult({ result }) {
-  const rec = result.compliance?.recording ?? result.recording;
-  const ref = result.compliance?.refund ?? result.refund;
+  const rec = result.compliance?.recording;
+  const ref = result.compliance?.refund;
+  if (!result.compliance) return <div className="card"><h3>Call result</h3><p className="muted">Compliance not available for this call.</p></div>;
   return (
     <div className="card">
       <h3>Call result</h3>
