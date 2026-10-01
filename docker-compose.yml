@@ -1,0 +1,15 @@
+services:
+  livekit:
+    image: livekit/livekit-server:v1.8.4
+    command: --config /etc/livekit/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
+    ports:
+      # 7880/tcp: signalling (WebSocket + HTTP API + tokens verify here)
+      - "7880:7880"
+      # 7881/tcp: RTC TCP fallback (when UDP blocked; ICE-TCP / TURN-TCP path)
+      - "7881:7881"
+      # 50000-50100/udp: WebRTC media (SRTP/SRTCP Opus audio, ICE host/srflx)
+      - "50000-50010:50000-50010/udp"
+    environment:
+      LIVEKIT_NODE_IP: 127.0.0.1

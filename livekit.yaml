@@ -1,0 +1,15 @@
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50010
+  use_external_ip: false
+room:
+  empty_timeout: 300
+  departure_timeout: 20
+keys:
+  devkey: devsecret-change-me-0123456789abcdef-LOCALONLY
+turn:
+  enabled: false
