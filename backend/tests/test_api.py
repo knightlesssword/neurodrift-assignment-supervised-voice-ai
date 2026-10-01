@@ -58,3 +58,10 @@ def test_end_empty_call_is_not_pass():
     data = r.json()["compliance"]
     assert data["recording"]["pass"] is False
     assert data["refund"]["pass"] is None and data["refund"]["error"]
+
+
+def test_pages_served():
+    r = client.get("/")
+    assert r.status_code == 200 and "Customer call" in r.text
+    r2 = client.get("/supervisor")
+    assert r2.status_code == 200 and "Supervisor" in r2.text

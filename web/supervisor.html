@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Supervisor Monitor (Part E)</title>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.4/dist/livekit-client.umd.min.js"></script>
+<style>body{font-family:sans-serif;max-width:640px;margin:2em auto}#log{border:1px solid #ccc;height:240px;overflow-y:auto;padding:8px}.agent{color:#0a5}.user{color:#06c}.err{color:red}#status{margin:8px 0}</style>
+</head>
+<body>
+<h2>Supervisor (hidden listen + whisper)</h2>
+<p>You join subscribe-only with a hidden token and publish no audio tracks,
+so the customer cannot tell you are here.</p>
+<label>Backend <input id="base" value="http://localhost:8000" size="28"></label><br><br>
+<label>Call ID <input id="callId" size="20" placeholder="call-xxxxxxxx"></label>
+<button id="join">Listen</button>
+<button id="leave" disabled>Leave</button>
+<div id="status">idle</div>
+<h3>Whisper (private guidance to the agent)</h3>
+<input id="whisper" size="50" placeholder="e.g. offer a 10% discount">
+<button id="send" disabled>Send whisper</button>
+<h3>Live transcript</h3>
+<div id="log"></div>
+<div id="audios"></div>
+<script>
+const $ = id => document.getElementById(id);
+const status = t => { $('status').textContent = t; };
+const err = t => { const d = document.createElement('div'); d.className = 'err'; d.textContent = t; $('log').appendChild(d); };
+const line = (speaker, text) => {
+  const d = document.createElement('div');
+  d.className = speaker;
+  d.textContent = (speaker === 'agent' ? 'agent: ' : 'user: ') + text;
+  $('log').appendChild(d);
+  $('log').scrollTop = $('log').scrollHeight;
+};
+let room = null;
+const base = () => $('base').value.replace(/\/$/, '');
+
+$('join').onclick = async () => {
+  try {
+    status('fetching supervisor token…');
+    const r = await fetch(base() + '/calls/' + $('callId').value + '/supervisor-token', {method: 'POST'});
+    if (!r.ok) throw new Error('supervisor-token ' + r.status + ': ' + await r.text());
+    const tok = await r.json();
+    room = new LivekitClient.Room();
+    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+      if (track.kind !== LivekitClient.Track.Kind.Audio) return;
+      const el = document.createElement('audio');
+      el.autoplay = true;
+      el.title = participant.identity;
+      track.attach(el);
+      $('audios').appendChild(el);
+      status('listening: ' + participant.identity);
+    });
+    room.on(LivekitClient.RoomEvent.DataReceived, (payload, _p, _k, topic) => {
+      if (topic !== 'transcript') return;
+      try {
+        const m = JSON.parse(new TextDecoder().decode(payload));
+        line(m.speaker, m.text);
+      } catch (e) { err('bad transcript payload: ' + e); }
+    });
+    room.on(LivekitClient.RoomEvent.Disconnected, () => status('left'));
+    await room.connect(tok.url, tok.token);
+    // Deliberately publish nothing: no mic, no tracks.
+    status('listening to ' + tok.room + ' (hidden, publishing nothing)');
+    $('join').disabled = true; $('leave').disabled = false; $('send').disabled = false;
+  } catch (e) { err(String(e)); status('error'); }
+};
+
+$('send').onclick = async () => {
+  try {
+    const text = $('whisper').value.trim();
+    if (!text) return;
+    await room.localParticipant.publishData(new TextEncoder().encode(text),
+      {reliable: true, topic: 'supervisor-whisper'});
+    status('whisper sent — agent uses it in its next reply, never reads it out');
+    $('whisper').value = '';
+  } catch (e) { err(String(e)); }
+};
+
+$('leave').onclick = async () => {
+  if (room) await room.disconnect();
+  $('join').disabled = false; $('leave').disabled = true; $('send').disabled = true;
+};
+</script>
+</body>
+</html>

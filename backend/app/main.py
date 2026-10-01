@@ -1,8 +1,10 @@
 """FastAPI backend (Part C). 4 required endpoints + list/end helpers."""
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
 from . import db
 from . import compliance as comp
@@ -18,6 +20,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Supervised Voice AI PoC", lifespan=lifespan)
+
+WEB_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "web")
+
+
+@app.get("/", include_in_schema=False)
+def customer_page():
+    return FileResponse(os.path.join(WEB_DIR, "customer.html"))
+
+
+@app.get("/supervisor", include_in_schema=False)
+def supervisor_page():
+    return FileResponse(os.path.join(WEB_DIR, "supervisor.html"))
 
 
 def _row_to_agent(r) -> dict:

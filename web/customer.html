@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Customer Call (Part D)</title>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.4/dist/livekit-client.umd.min.js"></script>
+<style>body{font-family:sans-serif;max-width:640px;margin:2em auto}#log{border:1px solid #ccc;height:240px;overflow-y:auto;padding:8px}.agent{color:#0a5}.user{color:#06c}.err{color:red}#status{margin:8px 0}</style>
+</head>
+<body>
+<h2>Customer call</h2>
+<label>Backend <input id="base" value="http://localhost:8000" size="28"></label><br><br>
+<label>Agent <select id="agents"></select></label>
+<button id="refresh">Refresh</button><br><br>
+<button id="call">Call</button>
+<button id="hangup" disabled>Hang up</button>
+<div id="status">idle</div>
+<h3>Live transcript</h3>
+<div id="log"></div>
+<audio id="agentAudio" autoplay></audio>
+<script>
+const $ = id => document.getElementById(id);
+const status = t => { $('status').textContent = t; };
+const err = t => { const d = document.createElement('div'); d.className = 'err'; d.textContent = t; $('log').appendChild(d); };
+const line = (speaker, text) => {
+  const d = document.createElement('div');
+  d.className = speaker;
+  d.textContent = (speaker === 'agent' ? 'agent: ' : 'user: ') + text;
+  $('log').appendChild(d);
+  $('log').scrollTop = $('log').scrollHeight;
+};
+let room = null, callId = null;
+const base = () => $('base').value.replace(/\/$/, '');
+
+async function loadAgents() {
+  try {
+    const r = await fetch(base() + '/agents');
+    const agents = await r.json();
+    $('agents').innerHTML = agents.map(a =>
+      `<option value="${a.id}">${a.name} (${a.id})</option>`).join('') || '<option value="">(none — create one via POST /agents)</option>';
+  } catch (e) { err('load agents failed: ' + e); }
+}
+$('refresh').onclick = loadAgents;
+loadAgents();
+
+$('call').onclick = async () => {
+  try {
+    status('creating call…');
+    const r = await fetch(base() + '/calls', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({agent_id: $('agents').value}),
+    });
+    if (!r.ok) throw new Error('POST /calls ' + r.status + ': ' + await r.text());
+    const call = await r.json();
+    callId = call.call_id;
+    status('connecting to room ' + call.room + '… (dispatched=' + call.agent_dispatched + ')');
+    room = new LivekitClient.Room();
+    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+      if (track.kind === LivekitClient.Track.Kind.Audio) track.attach($('agentAudio'));
+    });
+    room.on(LivekitClient.RoomEvent.DataReceived, (payload, _p, _k, topic) => {
+      if (topic !== 'transcript') return;
+      try {
+        const m = JSON.parse(new TextDecoder().decode(payload));
+        line(m.speaker, m.text);
+      } catch (e) { err('bad transcript payload: ' + e); }
+    });
+    room.on(LivekitClient.RoomEvent.Disconnected, () => status('disconnected'));
+    await room.connect(call.url, call.token);
+    await room.localParticipant.setMicrophoneEnabled(true);
+    status('in call ' + callId + ' — talk now');
+    $('call').disabled = true; $('hangup').disabled = false;
+  } catch (e) { err(String(e)); status('error'); }
+};
+
+$('hangup').onclick = async () => {
+  try {
+    if (room) await room.disconnect();
+    status('ending call…');
+    const r = await fetch(base() + '/calls/' + callId + '/end', {method: 'POST'});
+    const body = await r.json();
+    status('ended. recording_pass=' + body.compliance.recording.pass +
+      ' refund_pass=' + body.compliance.refund.pass +
+      (body.compliance.refund.offending_line ? ' line=' + body.compliance.refund.offending_line : ''));
+  } catch (e) { err(String(e)); }
+  $('call').disabled = false; $('hangup').disabled = true;
+};
+</script>
+</body>
+</html>

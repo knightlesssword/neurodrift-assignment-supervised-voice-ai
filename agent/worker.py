@@ -21,7 +21,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from livekit import agents, rtc  # noqa: E402
-from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions  # noqa: E402
+from livekit.agents import Agent, AgentSession, JobContext, JobProcess, WorkerOptions  # noqa: E402
 from livekit.agents.llm import ChatMessage  # noqa: E402
 from livekit.plugins import deepgram, openai, silero  # noqa: E402
 
@@ -121,6 +121,12 @@ def finish_call_via_backend(call_id: str) -> None:
         logger.error("call %s finish failed: %s", call_id, exc)
 
 
+def prewarm(proc: JobProcess):
+    # Keep one warm process ready (VAD weights loaded) so dispatches join fast.
+    # Must be sync: the worker calls prewarm_fnc without awaiting it.
+    proc.userdata["vad"] = silero.VAD.load()
+
+
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
     room_name = ctx.room.name
@@ -143,7 +149,7 @@ async def entrypoint(ctx: JobContext):
         # Ollama speaks the OpenAI chat API; api_key is a required-but-ignored dummy.
         llm=openai.LLM(model=cfg["model"], base_url=ollama_base, api_key="ollama-local"),
         tts=deepgram.TTS(model=cfg["voice"]),
-        vad=silero.VAD.load(),
+        vad=ctx.proc.userdata.get("vad") or silero.VAD.load(),
         allow_interruptions=True,
         use_tts_aligned_transcript=True,
     )
@@ -263,4 +269,5 @@ async def entrypoint(ctx: JobContext):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    agents.cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, agent_name="support-agent"))
+    agents.cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm,
+                                     agent_name="support-agent", num_idle_processes=1))
