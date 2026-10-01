@@ -98,9 +98,10 @@ export default function Call() {
 }
 
 function CallResult({ result }) {
-  const rec = result.compliance?.recording;
-  const ref = result.compliance?.refund;
-  if (!result.compliance) return <div className="card"><h3>Call result</h3><p className="muted">Compliance not available for this call.</p></div>;
+  const c = normalizeCompliance(result.compliance);
+  const rec = c?.recording;
+  const ref = c?.refund;
+  if (!c) return <div className="card"><h3>Call result</h3><p className="muted">Compliance not available for this call.</p></div>;
   return (
     <div className="card">
       <h3>Call result</h3>
@@ -121,6 +122,18 @@ function CallResult({ result }) {
       )}
     </div>
   );
+}
+
+// GET /calls returns the flat DB row; POST /end returns nested objects.
+// Normalize either shape to {recording:{pass,evidence,reason},refund:{pass,offending_line,error}}.
+function normalizeCompliance(c) {
+  if (!c) return null;
+  if (c.recording || c.refund) return c;
+  const bit = v => (v === null || v === undefined ? null : v === 1 || v === true);
+  return {
+    recording: {pass: bit(c.recording_pass), evidence: c.recording_evidence ?? null, reason: c.recording_reason ?? null},
+    refund: {pass: bit(c.refund_pass), offending_line: c.refund_offending_line ?? null, error: c.refund_error ?? null},
+  };
 }
 
 const fmt = v => v == null ? '—' : v.toFixed(1);
