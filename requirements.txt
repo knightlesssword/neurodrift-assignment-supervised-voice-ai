@@ -1,6 +1,16 @@
 fastapi==0.115.6
 uvicorn==0.34.0
 pydantic==2.10.4
-livekit-api==1.0.0
+livekit-api==1.2.1
+livekit==1.1.18
+livekit-agents==1.8.3
+livekit-protocol==1.1.27
+livekit-plugins-deepgram==1.8.3
+livekit-plugins-openai==1.8.3
+livekit-plugins-silero==1.8.3
+livekit-plugins-turn-detector==1.8.3
+openai==2.54.0
+onnxruntime==1.30.0
+numpy==2.4.6
 pytest==8.3.4
 httpx==0.28.1
