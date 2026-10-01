@@ -12,4 +12,8 @@ room:
 keys:
   devkey: devsecret-change-me-0123456789abcdef-LOCALONLY
 turn:
-  enabled: false
+  # Embedded TURN/UDP relay (also STUN). Browser/probes reach it via the
+  # published 3478/udp on the API host, so relay candidates work even though
+  # container IPs (172.x) are not routable from the Mac host (Docker Desktop).
+  enabled: true
+  udp_port: 3478

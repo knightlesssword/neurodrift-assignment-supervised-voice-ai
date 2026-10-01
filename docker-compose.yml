@@ -11,6 +11,9 @@ services:
       - "7881:7881"
       # 50000-50100/udp: WebRTC media (SRTP/SRTCP Opus audio, ICE host/srflx)
       - "50000-50010:50000-50010/udp"
+      # 3478/udp: embedded TURN/UDP relay (+STUN). Host-reachable relay path
+      # for Docker Desktop, where container IPs are not directly routable.
+      - "3478:3478/udp"
     environment:
       LIVEKIT_NODE_IP: 127.0.0.1
 # NOTE: Ollama runs natively (Ollama.app) on 11434 — no container here
