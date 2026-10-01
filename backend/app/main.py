@@ -86,10 +86,11 @@ def delete_agent(agent_id: str):
         if not a:
             raise HTTPException(404, f"agent {agent_id} not found")
         live = conn.execute(
-            "SELECT COUNT(*) FROM calls WHERE agent_id=? AND status != 'ended'", (agent_id,)
-        ).fetchone()[0]
+            "SELECT id FROM calls WHERE agent_id=? AND status != 'ended'", (agent_id,)
+        ).fetchall()
         if live:
-            raise HTTPException(409, f"agent {agent_id} has {live} live call(s); end them first")
+            ids = ", ".join(r[0] for r in live)
+            raise HTTPException(409, f"agent {agent_id} has live call(s) [{ids}]; end them first")
         conn.execute("DELETE FROM agents WHERE id=?", (agent_id,))
         conn.commit()
     finally:
