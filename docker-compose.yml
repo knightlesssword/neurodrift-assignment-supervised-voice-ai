@@ -13,3 +13,5 @@ services:
       - "50000-50010:50000-50010/udp"
     environment:
       LIVEKIT_NODE_IP: 127.0.0.1
+# NOTE: Ollama runs natively (Ollama.app) on 11434 — no container here
+# to avoid port clash. Backend uses OPENROUTER_* when set, else OLLAMA_*.
