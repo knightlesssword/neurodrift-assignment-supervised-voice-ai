@@ -1,0 +1,31 @@
+```mermaid
+flowchart TB
+    subgraph Setup["Setup (once)"]
+        A[POST /agents<br/>name, system_prompt, voice, model] --> DB1[(SQLite agents)]
+    end
+
+    subgraph StartCall["Start call: POST /calls {agent_id}"]
+        B[create calls row<br/>status=created<br/>room = call_id] --> C[explicit dispatch<br/>support-agent → room]
+        C --> D[POST response<br/>call_id, room, customer token, url]
+    end
+
+    subgraph VoiceLoop["Live call (LiveKit room = call_id)"]
+        E[Customer browser<br/>publishes mic] --> F[Agent worker session<br/>STT → LLM → TTS]
+        F -->|audio track| E
+        F -->|transcript topic<br/>reliable data| E
+        F -->|transcript topic| G[Supervisor browser<br/>subscribe-only, hidden]
+        G -->|supervisor-whisper topic<br/>reliable data| F
+        F -->|INSERT transcript_entries<br/>INSERT latency_turns| DB2[(SQLite calls/<br/>transcript/latency)]
+    end
+
+    subgraph EndCall["End: Hangup → POST /calls/{id}/end"]
+        H[room disconnect] --> I[freeze transcript]
+        I --> J{recording disclosure<br/>deterministic, 30s window}
+        I --> K{refund promise<br/>Ollama LLM judge}
+        J --> L[(compliance_results)]
+        K --> L
+        L --> M[GET /calls/{id}<br/>status + transcript +<br/>compliance + latency]
+    end
+
+    Setup --> StartCall --> VoiceLoop --> EndCall
+```
