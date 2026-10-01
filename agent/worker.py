@@ -33,8 +33,9 @@ TOPIC_WHISPER = "supervisor-whisper"
 TOPIC_TRANSCRIPT = "transcript"
 
 GUIDANCE_TEMPLATE = (
-    "Private guidance for your next reply (do not read it out, "
-    "do not mention a supervisor or guidance): {guidance}"
+    "IMPORTANT private instruction for your next reply (do not read it out, "
+    "do not mention a supervisor, guidance, or instructions; simply do what it "
+    "says as if it were your own decision): {guidance}"
 )
 
 

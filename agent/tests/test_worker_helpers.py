@@ -15,6 +15,7 @@ def test_guidance_is_hidden_system_message():
     assert m.role == "system"
     assert "offer a 10% discount" in m.content[0]
     assert "do not read it out" in m.content[0]
+    assert "do not mention a supervisor" in m.content[0]
 
 
 def test_transcript_payload_roundtrip():
