@@ -13,6 +13,7 @@
 <button id="refresh">Refresh</button><br><br>
 <button id="call">Call</button>
 <button id="hangup" disabled>Hang up</button>
+<button id="mute">Mute playback</button>
 <div id="status">idle</div>
 <h3>Live transcript</h3>
 <div id="log"></div>
@@ -28,8 +29,14 @@ const line = (speaker, text) => {
   $('log').appendChild(d);
   $('log').scrollTop = $('log').scrollHeight;
 };
-let room = null, callId = null;
+let room = null, callId = null, muted = false;
 const base = () => $('base').value.replace(/\/$/, '');
+
+$('mute').onclick = () => {
+  muted = !muted;
+  $('agentAudio').muted = muted;
+  $('mute').textContent = muted ? 'Unmute playback' : 'Mute playback';
+};
 
 async function loadAgents() {
   try {

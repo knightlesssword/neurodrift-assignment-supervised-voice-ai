@@ -46,6 +46,7 @@ def test_supervisor_token():
     payload = r.json()["token"].split(".")[1] + "=="
     grants = json.loads(base64.urlsafe_b64decode(payload))["video"]
     assert grants["canPublish"] is False and grants["hidden"] is True
+    assert grants["canPublishData"] is True  # supervisor must send whispers
     client.post(f"/calls/{cid}/end")
     assert client.post(f"/calls/{cid}/supervisor-token").status_code == 409
 

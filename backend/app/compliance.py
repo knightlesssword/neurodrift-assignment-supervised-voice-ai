@@ -59,7 +59,9 @@ def check_refund_promise(entries: list[dict]) -> dict:
         verdict = parsed.get("pass")
         if not isinstance(verdict, bool):
             return {"pass": None, "offending_line": None, "error": f"bad verdict: {content[:200]}"}
+        if verdict is True:
+            return {"pass": True, "offending_line": None, "error": None}
         line = parsed.get("offending_line")
-        return {"pass": verdict, "offending_line": line if isinstance(line, str) else None, "error": None}
+        return {"pass": False, "offending_line": line if isinstance(line, str) else None, "error": None}
     except Exception as exc:  # evaluator failure is NEVER a pass
         return {"pass": None, "offending_line": None, "error": f"evaluator error: {exc}"}

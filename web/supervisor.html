@@ -14,6 +14,7 @@ so the customer cannot tell you are here.</p>
 <label>Call ID <input id="callId" size="20" placeholder="call-xxxxxxxx"></label>
 <button id="join">Listen</button>
 <button id="leave" disabled>Leave</button>
+<button id="mute">Mute playback</button>
 <div id="status">idle</div>
 <h3>Whisper (private guidance to the agent)</h3>
 <input id="whisper" size="50" placeholder="e.g. offer a 10% discount">
@@ -32,8 +33,15 @@ const line = (speaker, text) => {
   $('log').appendChild(d);
   $('log').scrollTop = $('log').scrollHeight;
 };
-let room = null;
+let room = null, muted = false;
 const base = () => $('base').value.replace(/\/$/, '');
+
+function setMuted(m) {
+  muted = m;
+  document.querySelectorAll('#audios audio').forEach(el => { el.muted = m; });
+  $('mute').textContent = m ? 'Unmute playback' : 'Mute playback';
+}
+$('mute').onclick = () => setMuted(!muted);
 
 $('join').onclick = async () => {
   try {

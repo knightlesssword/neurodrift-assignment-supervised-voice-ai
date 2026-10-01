@@ -180,6 +180,8 @@ async def entrypoint(ctx: JobContext):
 
     def on_data(packet: rtc.DataPacket):
         try:
+            log.debug("data received topic=%r from=%s", packet.topic,
+                      getattr(packet.participant, "identity", None))
             if packet.topic != TOPIC_WHISPER:
                 return
             guidance = packet.data.decode().strip()

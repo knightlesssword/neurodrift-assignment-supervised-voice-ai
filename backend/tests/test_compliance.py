@@ -60,6 +60,18 @@ def test_refund_prompt_formats_without_crash(monkeypatch):
     assert '{"pass"' in prompt  # schema example reached the model intact
 
 
+def test_refund_pass_clears_offending_line(monkeypatch):
+    import backend.app.compliance as C
+
+    def fake_urlopen(req, timeout=90):
+        inner = '{"pass": true, "offending_line": "some line"}'
+        return _Resp(('{"message": {"content": %s}}' % json.dumps(inner)).encode())
+
+    monkeypatch.setattr(C.urllib.request, "urlopen", fake_urlopen)
+    out = check_refund_promise([{"speaker": "agent", "text": "hello"}])
+    assert out == {"pass": True, "offending_line": None, "error": None}
+
+
 def test_refund_evaluator_error_is_never_pass(monkeypatch):
     import backend.app.compliance as C
 
