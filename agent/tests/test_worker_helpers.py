@@ -1,11 +1,6 @@
 import json
-import os
-import tempfile
 
 import pytest
-
-tmp = tempfile.mkdtemp()
-os.environ["DATABASE_URL"] = f"sqlite:///{tmp}/w.db"
 
 from agent.worker import (  # noqa: E402
     guidance_message,
