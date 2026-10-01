@@ -47,6 +47,19 @@ def transcript_payload(speaker: str, text: str, ts: float) -> bytes:
     return json.dumps({"speaker": speaker, "text": text, "ts": ts}).encode()
 
 
+def clean_agent_text(text: str) -> str:
+    """Strip a leading role echo some chat templates leak (e.g. 'assistant\\n...')."""
+    stripped = text.strip()
+    low = stripped.lower()
+    if low == "assistant":
+        return ""
+    if low.startswith("assistant\n"):
+        return stripped.split("\n", 1)[1].strip()
+    if low.startswith("assistant:"):
+        return stripped.split(":", 1)[1].strip()
+    return stripped
+
+
 def latency_ms_from_metrics(user_m: dict, asst_m: dict) -> dict:
     """Map framework MetricsReport fields to Part G stages 1-3 (ms)."""
     out = {}
@@ -208,7 +221,7 @@ async def entrypoint(ctx: JobContext):
         item = ev.item
         if not isinstance(item, ChatMessage) or not item.text_content:
             return
-        text = item.text_content.strip()
+        text = clean_agent_text(item.text_content or "")
         if not text or item.role not in ("user", "assistant"):
             return
         if item.role == "user":

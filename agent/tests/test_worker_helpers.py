@@ -38,3 +38,11 @@ def test_publish_stage_none_when_no_playback():
 def test_publish_stage_math():
     # tts_first = 100 + 0.5 + 0.3 = 100.8; speaking at 101.0 -> ~200ms
     assert publish_stage_ms(100.0, 0.5, 0.3, 101.0) == pytest.approx(200.0)
+
+
+def test_clean_agent_text_strips_role_echo():
+    from agent.worker import clean_agent_text
+    assert clean_agent_text("assistant\nHello there") == "Hello there"
+    assert clean_agent_text("Assistant: hi") == "hi"
+    assert clean_agent_text("Hello there") == "Hello there"
+    assert clean_agent_text("assistant") == ""
