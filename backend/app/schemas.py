@@ -8,7 +8,7 @@ Speaker = Literal["agent", "user"]
 class AgentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     system_prompt: str = Field(min_length=1, max_length=8000)
-    voice: str = Field(default="deepgram-aura-asteria", max_length=100)
+    voice: str = Field(default="aura-asteria-en", max_length=100)
     model: str = Field(default="llama3.2:3b", max_length=100)
 
 

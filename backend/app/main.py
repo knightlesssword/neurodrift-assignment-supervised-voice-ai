@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 
 from . import db
 from . import compliance as comp
+from . import dispatch as disp
 from . import livekit_tokens as tok
 from .schemas import AgentCreate, CallCreate
 
@@ -61,7 +62,7 @@ def list_agents():
 
 
 @app.post("/calls", status_code=201)
-def start_call(body: CallCreate):
+async def start_call(body: CallCreate):
     conn = db.get_conn()
     try:
         a = conn.execute("SELECT * FROM agents WHERE id=?", (body.agent_id,)).fetchone()
@@ -77,12 +78,33 @@ def start_call(body: CallCreate):
         conn.commit()
     finally:
         conn.close()
-    # Rooms auto-create on first join; explicit agent dispatch lands with worker (Part B).
+    # Explicit dispatch: registered support-agent worker joins this room (dispatch model).
+    dispatched = await disp.dispatch_agent(room, call_id)
     try:
         token = tok.mint_token(room, f"customer-{call_id}")
     except RuntimeError as exc:
         raise HTTPException(500, str(exc))
-    return {"call_id": call_id, "room": room, "token": token, "url": tok.livekit_url(), "status": "created"}
+    return {"call_id": call_id, "room": room, "token": token,
+            "url": tok.livekit_url(), "status": "created", "agent_dispatched": dispatched}
+
+
+@app.post("/calls/{call_id}/supervisor-token")
+def supervisor_token(call_id: str):
+    """Subscribe-only hidden token for the supervisor page (Part E listen)."""
+    conn = db.get_conn()
+    try:
+        c = conn.execute("SELECT * FROM calls WHERE id=?", (call_id,)).fetchone()
+    finally:
+        conn.close()
+    if not c:
+        raise HTTPException(404, f"call {call_id} not found")
+    if c["status"] == "ended":
+        raise HTTPException(409, f"call {call_id} already ended")
+    try:
+        token = tok.mint_token(c["room"], f"supervisor-{call_id}", subscribe_only=True)
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc))
+    return {"room": c["room"], "token": token, "url": tok.livekit_url()}
 
 
 @app.get("/calls/{call_id}")

@@ -126,6 +126,12 @@ async def entrypoint(ctx: JobContext):
     room_name = ctx.room.name
     cfg = lookup_agent(room_name)
     call_id = cfg["call_id"]
+    try:  # explicit dispatch carries call_id in job metadata; room lookup is the fallback
+        meta = getattr(getattr(ctx, "job", None), "metadata", None)
+        if meta:
+            call_id = json.loads(meta).get("call_id", call_id)
+    except Exception:
+        pass
     log = logging.LoggerAdapter(logger, {"call_id": call_id})
     deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "")
     if not deepgram_key:
@@ -134,12 +140,12 @@ async def entrypoint(ctx: JobContext):
 
     session = AgentSession(
         stt=deepgram.STT(),
-        llm=openai.LLM(model=cfg["model"], base_url=ollama_base),
+        # Ollama speaks the OpenAI chat API; api_key is a required-but-ignored dummy.
+        llm=openai.LLM(model=cfg["model"], base_url=ollama_base, api_key="ollama-local"),
         tts=deepgram.TTS(model=cfg["voice"]),
         vad=silero.VAD.load(),
         allow_interruptions=True,
         use_tts_aligned_transcript=True,
-        min_interruption_duration=0.5,
     )
     agent = Agent(instructions=cfg["system_prompt"])
     turns = {"n": 0, "speaking_at": None, "user_m": {}, "asst_m": {}, "asst_created": None}
@@ -166,6 +172,24 @@ async def entrypoint(ctx: JobContext):
             log.warning("whisper handling failed: %s", exc)
 
     ctx.room.on("data_received", on_data)
+
+    emptied = asyncio.Event()
+    customer_ever_joined = asyncio.Event()
+
+    def on_participant_joined(*_args):
+        # The agent is dispatched before the customer opens the page; the
+        # join event both arms the end-of-call trigger and releases the
+        # greeting (RoomIO needs a subscriber to publish audio).
+        customer_ever_joined.set()
+
+    def on_participant_left(*_args):
+        # End the call once everyone else has left (customer hangup).
+        if customer_ever_joined.is_set() and not ctx.room.remote_participants:
+            log.info("room emptied, ending call")
+            emptied.set()
+
+    ctx.room.on("participant_connected", on_participant_joined)
+    ctx.room.on("participant_disconnected", on_participant_left)
 
     @session.on("user_input_transcribed")
     def _user_transcribed(ev):
@@ -208,18 +232,30 @@ async def entrypoint(ctx: JobContext):
                 log.info("agent speech interrupted; history keeps spoken portion only")
         handle.add_done_callback(_done)
 
+    @session.on("error")
+    def _sess_error(ev):
+        log.error("session error: %s", ev)
+
     await session.start(room=ctx.room, agent=agent)
     log.info("worker joined room %s as agent '%s'", room_name, cfg["name"])
-    await session.generate_reply(instructions="Greet the caller briefly.")
 
-    emptied = asyncio.Event()
+    # RoomIO only publishes the agent audio track once someone subscribes;
+    # with an empty room the first speech would stall forever. The worker is
+    # usually dispatched before the customer opens the page, so wait for them —
+    # but a fast customer can beat the (slow-spawning) job into the room, in
+    # which case no join event fires and we must not wait at all.
+    if not customer_ever_joined.is_set() and not ctx.room.remote_participants:
+        log.info("waiting for customer to join before greeting")
+        await customer_ever_joined.wait()
 
-    def on_participant_left(*_args):
-        # End the call once no remote participants (customer/supervisor) remain.
-        if not ctx.room.remote_participants:
-            emptied.set()
+    try:
+        # Greeting carries the recording disclosure (per DB persona prompt).
+        handle = session.generate_reply(instructions="Greet the caller briefly.")
+        await asyncio.wait_for(handle, timeout=120)
+        log.info("greeting done, exc=%s", handle.exception())
+    except asyncio.TimeoutError:
+        log.error("greeting timed out after 120s; staying in room for user speech")
 
-    ctx.room.on("participant_disconnected", on_participant_left)
     await emptied.wait()
     await session.aclose()
     finish_call_via_backend(call_id)

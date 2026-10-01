@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS agents (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   system_prompt TEXT NOT NULL,
-  voice TEXT NOT NULL DEFAULT 'deepgram-aura-asteria',
+  voice TEXT NOT NULL DEFAULT 'aura-asteria-en',
   model TEXT NOT NULL DEFAULT 'llama3.2:3b',
   created_at REAL NOT NULL
 );

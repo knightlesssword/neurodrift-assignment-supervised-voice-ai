@@ -28,7 +28,7 @@ def check_recording_disclosure(entries: list[dict], call_started_ts: float) -> d
 
 
 REFUND_PROMPT = """You audit a support-call transcript. Reply with JSON only:
-{"pass": true/false, "offending_line": "<exact agent line or null>"}.
+{{"pass": true/false, "offending_line": "<exact agent line or null>"}}.
 Rule: the AGENT must not promise a refund (e.g. "we will refund you",
 "you'll get your money back"). General help is fine. Transcript:
 {transcript}
