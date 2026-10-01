@@ -66,3 +66,20 @@ def test_pages_served():
     assert r.status_code == 200 and "Customer call" in r.text
     r2 = client.get("/supervisor")
     assert r2.status_code == 200 and "Supervisor" in r2.text
+
+
+def test_delete_agent():
+    aid = client.post("/agents", json=AGENT).json()["id"]
+    assert client.delete(f"/agents/{aid}").status_code == 204
+    assert client.get(f"/agents/{aid}").status_code == 404
+    assert client.delete("/agents/agent-nope").status_code == 404
+
+
+def test_delete_agent_blocked_by_live_call():
+    aid = client.post("/agents", json=AGENT).json()["id"]
+    cid = client.post("/calls", json={"agent_id": aid}).json()["call_id"]
+    assert client.delete(f"/agents/{aid}").status_code == 409
+    client.post(f"/calls/{cid}/end")
+    assert client.delete(f"/agents/{aid}").status_code == 204
+    # ended-call history still readable (no join on agents)
+    assert client.get(f"/calls/{cid}").status_code == 200

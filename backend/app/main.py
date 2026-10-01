@@ -76,6 +76,27 @@ def list_agents():
     return [_row_to_agent(r) for r in rows]
 
 
+@app.delete("/agents/{agent_id}", status_code=204)
+def delete_agent(agent_id: str):
+    """Delete an agent config. Blocked (409) while live calls reference it;
+    ended-call history keeps working (GET /calls never joins agents)."""
+    conn = db.get_conn()
+    try:
+        a = conn.execute("SELECT * FROM agents WHERE id=?", (agent_id,)).fetchone()
+        if not a:
+            raise HTTPException(404, f"agent {agent_id} not found")
+        live = conn.execute(
+            "SELECT COUNT(*) FROM calls WHERE agent_id=? AND status != 'ended'", (agent_id,)
+        ).fetchone()[0]
+        if live:
+            raise HTTPException(409, f"agent {agent_id} has {live} live call(s); end them first")
+        conn.execute("DELETE FROM agents WHERE id=?", (agent_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return None
+
+
 @app.post("/calls", status_code=201)
 async def start_call(body: CallCreate):
     conn = db.get_conn()

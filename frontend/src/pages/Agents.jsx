@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listAgents, createAgent } from '../api.js';
+import { listAgents, createAgent, deleteAgent } from '../api.js';
 
 // Agent configs (POST /agents, GET /agents). System prompt lives in the DB.
 export default function Agents() {
@@ -12,6 +12,15 @@ export default function Agents() {
     catch (e) { setError(String(e)); }
   }
   useEffect(() => { load(); }, []);
+
+  async function onDelete(a) {
+    if (!window.confirm(`Delete agent "${a.name}" (${a.id})? Past ended calls keep working; live calls block this.`)) return;
+    setError('');
+    try {
+      await deleteAgent(a.id);
+      await load();
+    } catch (err) { setError(String(err)); }
+  }
 
   async function onCreate(e) {
     e.preventDefault();
@@ -29,9 +38,14 @@ export default function Agents() {
       <h2>Agents</h2>
       {error && <p className="error">{error}</p>}
       <table>
-        <thead><tr><th>id</th><th>name</th><th>voice</th><th>model</th></tr></thead>
+        <thead><tr><th>id</th><th>name</th><th>voice</th><th>model</th><th></th></tr></thead>
         <tbody>
-          {agents.map(a => <tr key={a.id}><td className="mono">{a.id}</td><td>{a.name}</td><td>{a.voice}</td><td>{a.model}</td></tr>)}
+          {agents.map(a => (
+            <tr key={a.id}>
+              <td className="mono">{a.id}</td><td>{a.name}</td><td>{a.voice}</td><td>{a.model}</td>
+              <td><button onClick={() => onDelete(a)} title={`Delete ${a.id}`} aria-label={`Delete agent ${a.name}`}>🗑</button></td>
+            </tr>
+          ))}
         </tbody>
       </table>
       <h3>New agent</h3>

@@ -22,6 +22,12 @@ async function req(method, path, body) {
 
 export const listAgents = () => req('GET', '/agents');
 export const createAgent = (a) => req('POST', '/agents', a);
+export const deleteAgent = async (id) => {
+  const r = await fetch(apiBase() + `/agents/${id}`, {method: 'DELETE'});
+  if (r.status === 204) return null;
+  const text = await r.text();
+  throw new Error(`DELETE /agents/${id} → ${r.status}: ${text.slice(0, 200)}`);
+};
 export const startCall = (agent_id) => req('POST', '/calls', {agent_id});
 export const getCall = (id) => req('GET', `/calls/${id}`);
 export const supervisorToken = (id) => req('POST', `/calls/${id}/supervisor-token`);
