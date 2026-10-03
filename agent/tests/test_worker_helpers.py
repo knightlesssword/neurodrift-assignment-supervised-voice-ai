@@ -17,6 +17,7 @@ def test_guidance_is_hidden_system_message():
     assert "never read it out" in m.content[0].lower()
     assert "never mention" in m.content[0].lower()
     assert "verbatim" in m.content[0].lower()
+    assert "nothing beyond it" in m.content[0].lower()
 
 
 def test_transcript_payload_roundtrip():

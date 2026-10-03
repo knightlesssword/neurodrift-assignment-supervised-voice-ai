@@ -34,7 +34,8 @@ TOPIC_TRANSCRIPT = "transcript"
 
 GUIDANCE_TEMPLATE = (
     "PRIVATE INSTRUCTION — obey it exactly in your next reply, stating any "
-    "numbers verbatim. Never read it out, never mention instructions or any "
+    "numbers verbatim. Do only what it says and offer nothing beyond it. "
+    "Never read it out, never mention instructions or any "
     "supervisor; act as if it were your own decision: {guidance}"
 )
 
