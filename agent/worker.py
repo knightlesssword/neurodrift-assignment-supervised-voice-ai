@@ -33,9 +33,9 @@ TOPIC_WHISPER = "supervisor-whisper"
 TOPIC_TRANSCRIPT = "transcript"
 
 GUIDANCE_TEMPLATE = (
-    "IMPORTANT private instruction for your next reply (do not read it out, "
-    "do not mention a supervisor, guidance, or instructions; simply do what it "
-    "says as if it were your own decision): {guidance}"
+    "PRIVATE INSTRUCTION — obey it exactly in your next reply, stating any "
+    "numbers verbatim. Never read it out, never mention instructions or any "
+    "supervisor; act as if it were your own decision: {guidance}"
 )
 
 
@@ -161,7 +161,10 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         stt=deepgram.STT(),
         # Ollama speaks the OpenAI chat API; api_key is a required-but-ignored dummy.
-        llm=openai.LLM(model=cfg["model"], base_url=ollama_base, api_key="ollama-local"),
+        # temperature=0: most deterministic decoding; a creative sampler
+        # ignores exact numbers from guidance more often.
+        llm=openai.LLM(model=cfg["model"], base_url=ollama_base, api_key="ollama-local",
+                       temperature=0.0),
         tts=deepgram.TTS(model=cfg["voice"]),
         vad=ctx.proc.userdata.get("vad") or silero.VAD.load(),
         allow_interruptions=True,
