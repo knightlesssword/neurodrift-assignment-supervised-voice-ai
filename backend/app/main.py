@@ -125,7 +125,7 @@ async def start_call(body: CallCreate):
     try:
         conn.execute(
             "INSERT OR REPLACE INTO recordings (call_id,egress_id,filepath,status) VALUES (?,?,?,?)",
-            (call_id, egress_id, f"recordings/{call_id}.mp3",
+            (call_id, egress_id, f"recordings/{call_id}.ogg",
              "recording" if egress_id else "unavailable"),
         )
         conn.commit()

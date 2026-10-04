@@ -9,7 +9,7 @@ class _EgressSvc:
 
     async def start_room_composite_egress(self, req):
         assert req.audio_only is True
-        assert req.file.filepath.endswith(".mp3")
+        assert req.file.filepath.endswith(".ogg")
 
         class R:
             egress_id = "eg-123" if self.ok else None

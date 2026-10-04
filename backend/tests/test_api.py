@@ -89,7 +89,7 @@ def test_recordings_lifecycle():
     aid = client.post("/agents", json=AGENT).json()["id"]
     cid = client.post("/calls", json={"agent_id": aid}).json()["call_id"]
     g = client.get(f"/calls/{cid}").json()
-    assert g["recording"] is not None and g["recording"]["filepath"].endswith(".mp3")
+    assert g["recording"] is not None and g["recording"]["filepath"].endswith(".ogg")
     assert g["recording"]["status"] in ("recording", "unavailable")
     r = client.post(f"/calls/{cid}/end")
     assert r.status_code == 200

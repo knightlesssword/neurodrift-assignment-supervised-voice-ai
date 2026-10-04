@@ -29,8 +29,10 @@ async def start_recording(room: str, call_id: str) -> str | None:
             room_name=room,
             audio_only=True,
             file=eg.EncodedFileOutput(
-                file_type=eg.EncodedFileType.MP3,
-                filepath=f"/out/recordings/{call_id}.mp3",
+                # Audio-only composite records Opus-in-Ogg; request OGG so
+                # the filename matches the container (egress appends .ogg).
+                file_type=eg.EncodedFileType.OGG,
+                filepath=f"/out/recordings/{call_id}.ogg",
             ),
         )
         res = await lk.egress.start_room_composite_egress(req)
