@@ -13,3 +13,4 @@ venv/
 # Node (if ever added)
 node_modules/
 *.mp3
+*.ogg

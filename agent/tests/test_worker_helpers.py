@@ -49,3 +49,12 @@ def test_clean_agent_text_strips_role_echo():
     assert clean_agent_text("Assistant: hi") == "hi"
     assert clean_agent_text("Hello there") == "Hello there"
     assert clean_agent_text("assistant") == ""
+
+
+def test_parse_takeover():
+    from agent.worker import parse_takeover
+    assert parse_takeover(b'{"state": "taken"}') == "taken"
+    assert parse_takeover(b'{"state": "back"}') == "back"
+    assert parse_takeover(b'{"state": "nope"}') is None
+    assert parse_takeover(b'not json') is None
+    assert parse_takeover(b'') is None

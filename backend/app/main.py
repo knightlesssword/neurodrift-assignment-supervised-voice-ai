@@ -158,6 +158,30 @@ def supervisor_token(call_id: str):
     return {"room": c["room"], "token": token, "url": tok.public_livekit_url()}
 
 
+@app.post("/calls/{call_id}/takeover-token")
+def takeover_token(call_id: str):
+    """Publish-capable token for supervisor takeover (stretch).
+
+    Unlike the hidden listen token, this allows publishing the supervisor's
+    microphone so the customer hears them directly. The worker Fleet treats
+    the takeover data signal as handover, going deaf/silent until handback.
+    """
+    conn = db.get_conn()
+    try:
+        c = conn.execute("SELECT * FROM calls WHERE id=?", (call_id,)).fetchone()
+    finally:
+        conn.close()
+    if not c:
+        raise HTTPException(404, f"call {call_id} not found")
+    if c["status"] == "ended":
+        raise HTTPException(409, f"call {call_id} already ended")
+    try:
+        token = tok.mint_token(c["room"], f"supervisor-{call_id}-voice", subscribe_only=False)
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc))
+    return {"room": c["room"], "token": token, "url": tok.public_livekit_url()}
+
+
 @app.get("/calls/{call_id}")
 def get_call(call_id: str):
     conn = db.get_conn()

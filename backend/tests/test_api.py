@@ -95,3 +95,17 @@ def test_recordings_lifecycle():
     assert r.status_code == 200
     g2 = client.get(f"/calls/{cid}").json()
     assert g2["recording"]["status"] in ("stopped", "stop-failed", "unavailable")
+
+
+def test_takeover_token():
+    import base64
+    aid = client.post("/agents", json=AGENT).json()["id"]
+    cid = client.post("/calls", json={"agent_id": aid}).json()["call_id"]
+    assert client.post("/calls/call-nope/takeover-token").status_code == 404
+    r = client.post(f"/calls/{cid}/takeover-token")
+    assert r.status_code == 200, r.text
+    payload = r.json()["token"].split(".")[1] + "=="
+    grants = json.loads(base64.urlsafe_b64decode(payload))["video"]
+    assert grants["canPublish"] is True and grants["canSubscribe"] is True
+    client.post(f"/calls/{cid}/end")
+    assert client.post(f"/calls/{cid}/takeover-token").status_code == 409

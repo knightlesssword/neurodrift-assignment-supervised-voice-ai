@@ -31,4 +31,5 @@ export const deleteAgent = async (id) => {
 export const startCall = (agent_id) => req('POST', '/calls', {agent_id});
 export const getCall = (id) => req('GET', `/calls/${id}`);
 export const supervisorToken = (id) => req('POST', `/calls/${id}/supervisor-token`);
+export const takeoverToken = (id) => req('POST', `/calls/${id}/takeover-token`);
 export const endCall = (id) => req('POST', `/calls/${id}/end`);

@@ -31,6 +31,7 @@ logger = logging.getLogger("support-worker")
 
 TOPIC_WHISPER = "supervisor-whisper"
 TOPIC_TRANSCRIPT = "transcript"
+TOPIC_TAKEOVER = "supervisor-takeover"
 
 GUIDANCE_TEMPLATE = (
     "PRIVATE INSTRUCTION — obey it exactly in your next reply, stating any "
@@ -47,6 +48,40 @@ def guidance_message(guidance: str) -> ChatMessage:
 
 def transcript_payload(speaker: str, text: str, ts: float) -> bytes:
     return json.dumps({"speaker": speaker, "text": text, "ts": ts}).encode()
+
+
+def parse_takeover(data: bytes) -> str | None:
+    """Parse a supervisor-takeover data message. Returns taken/back/None.
+
+    >>> parse_takeover(b'{"state": "taken"}')
+    'taken'
+    """
+    try:
+        state = json.loads(data.decode()).get("state")
+    except Exception:
+        return None
+    return state if state in ("taken", "back") else None
+
+
+def set_remote_audio_subscribed(room, subscribed: bool) -> int:
+    """(Un)subscribe all remote audio tracks. Returns count changed."""
+    from livekit import rtc as _rtc
+
+    n = 0
+    try:
+        parts = room.remote_participants.values() if hasattr(room.remote_participants, "values") else []
+        for p in parts:
+            pubs = p.track_publications.values() if hasattr(p.track_publications, "values") else []
+            for pub in pubs:
+                try:
+                    if pub.kind == _rtc.TrackKind.KIND_AUDIO:
+                        pub.set_subscribed(subscribed)
+                        n += 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return n
 
 
 def clean_agent_text(text: str) -> str:
@@ -173,6 +208,29 @@ async def entrypoint(ctx: JobContext):
     )
     agent = Agent(instructions=cfg["system_prompt"])
     turns = {"n": 0, "speaking_at": None, "user_m": {}, "asst_m": {}, "asst_created": None}
+    taken = {"on": False}
+
+    async def resume_after_handover():
+        try:
+            handle = session.generate_reply(
+                instructions="The supervisor has handed the call back to you. Greet the caller briefly and continue helping.")
+            await asyncio.wait_for(handle, timeout=120)
+        except Exception as exc:
+            log.warning("resume line failed: %s", exc)
+
+    def on_track_subscribed(track, publication, participant):
+        # Tracks published mid-takeover (e.g. supervisor mic) auto-subscribe;
+        # keep the worker deaf until handback so nothing here becomes a turn.
+        if taken["on"]:
+            try:
+                from livekit import rtc as _rtc
+                if publication.kind == _rtc.TrackKind.KIND_AUDIO:
+                    publication.set_subscribed(False)
+                    log.debug("kept deaf during takeover (%s)", participant.identity)
+            except Exception as exc:
+                log.warning("deaf-guard failed: %s", exc)
+
+    ctx.room.on("track_subscribed", on_track_subscribed)
 
     async def publish(speaker: str, text: str):
         ts = time.time()
@@ -187,7 +245,23 @@ async def entrypoint(ctx: JobContext):
         try:
             log.debug("data received topic=%r from=%s", packet.topic,
                       getattr(packet.participant, "identity", None))
-            if packet.topic != TOPIC_WHISPER:
+            if packet.topic == TOPIC_TAKEOVER:
+                state = parse_takeover(packet.data)
+                if state == "taken" and not taken["on"]:
+                    taken["on"] = True
+                    log.info("supervisor takeover: interrupting, going deaf")
+                    try:
+                        session.interrupt()
+                    except Exception as exc:
+                        log.warning("interrupt on takeover failed: %s", exc)
+                    set_remote_audio_subscribed(ctx.room, False)
+                elif state == "back" and taken["on"]:
+                    taken["on"] = False
+                    set_remote_audio_subscribed(ctx.room, True)
+                    log.info("supervisor handed back: resuming")
+                    asyncio.get_event_loop().create_task(resume_after_handover())
+                return
+            if packet.topic != TOPIC_WHISPER or taken["on"]:
                 return
             guidance = packet.data.decode().strip()
             if not guidance:
@@ -234,6 +308,11 @@ async def entrypoint(ctx: JobContext):
         if item.role == "user":
             turns["user_m"] = dict(item.metrics or {})
         else:
+            if taken["on"]:
+                # Generated while the supervisor owns the call: never spoken,
+                # so it must not enter the transcript or latency history.
+                log.info("dropping unspoken assistant item from takeover window")
+                return
             turns["asst_m"] = dict(item.metrics or {})
             turns["asst_created"] = item.created_at
             asyncio.get_event_loop().create_task(publish("agent", text))
