@@ -136,7 +136,7 @@ async def start_call(body: CallCreate):
     except RuntimeError as exc:
         raise HTTPException(500, str(exc))
     return {"call_id": call_id, "room": room, "token": token,
-            "url": tok.livekit_url(), "status": "created", "agent_dispatched": dispatched}
+            "url": tok.public_livekit_url(), "status": "created", "agent_dispatched": dispatched}
 
 
 @app.post("/calls/{call_id}/supervisor-token")
@@ -155,7 +155,7 @@ def supervisor_token(call_id: str):
         token = tok.mint_token(c["room"], f"supervisor-{call_id}", subscribe_only=True)
     except RuntimeError as exc:
         raise HTTPException(500, str(exc))
-    return {"room": c["room"], "token": token, "url": tok.livekit_url()}
+    return {"room": c["room"], "token": token, "url": tok.public_livekit_url()}
 
 
 @app.get("/calls/{call_id}")

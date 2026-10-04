@@ -25,7 +25,10 @@ services:
     environment:
       # Inside the compose network, LiveKit is reachable by service name;
       # Ollama stays native on the Mac (host.docker.internal from containers).
+      # Browsers get PUBLIC_LIVEKIT_URL (host-mapped); server-side API calls
+      # (dispatch, egress) use the internal LIVEKIT_URL.
       LIVEKIT_URL: ws://livekit:7880
+      PUBLIC_LIVEKIT_URL: ws://localhost:7880
       OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
       DATABASE_URL: sqlite:////data/app.db
     volumes:

@@ -16,6 +16,14 @@ def livekit_url() -> str:
     return _cfg()[0]
 
 
+def public_livekit_url() -> str:
+    """URL handed to browser clients. Inside compose the server is reachable
+    internally as ws://livekit:7880, but browsers need the host-mapped address,
+    so deployments override with PUBLIC_LIVEKIT_URL (falls back to LIVEKIT_URL
+    for host-mode runs where both are localhost)."""
+    return os.environ.get("PUBLIC_LIVEKIT_URL", "").strip() or livekit_url()
+
+
 def mint_token(room: str, identity: str, *, subscribe_only: bool = False) -> str:
     """Mint a participant JWT. Supervisor gets subscribe-only (hidden listener).
 
