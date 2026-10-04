@@ -59,7 +59,7 @@ Demo: `POST /agents` (Swagger at http://localhost:8000/docs), open
 http://localhost:8000/ (customer, allow mic) → Call; second tab
 http://localhost:8000/supervisor → paste call-id → Listen → whisper →
 ask about discounts → Hang up → `GET /calls/{id}`.
-Tests: `.venv/bin/python -m pytest backend/tests/ agent/tests/ -q` (20 passed).
+Tests: `.venv/bin/python -m pytest backend/tests/ agent/tests/ -q` (25 passed).
 
 Seed prompt that satisfies the disclosure rule: tell the agent to state once,
 in its first message only, that the call is being recorded.
@@ -117,11 +117,19 @@ STT grows with utterance length (endpointing). Biggest lever: LLM/TTS choice.
   `ChatMessage.metrics`; Cloud inference endpoints (EOU/adaptive) 401 and fall
   back to local models automatically.
 
-## 7. What next (production direction)
+## 7. Stretch goals (done) + what next
 
-Stronger compliance judge + eval set; Postgres + auth; worker pool with
-explicit dispatch + readiness/prewarm; Egress recording; TURN/TLS + real domain
-for remote clients; latency attack order: model choice (LLM/TTS) first, then
-streaming/endpointing tuning. Stretch goals from the spec (takeover, Egress
-recording, concurrency demo, `compose up` everything) were deliberately left
-out until the required path was green — it now is.
+- **One-command setup:** `docker compose up` starts LiveKit, Redis, backend,
+  agent worker, and Egress (SQLite on `./data`, Ollama stays native).
+  Server-side calls use internal `ws://livekit:7880`; browsers get
+  `PUBLIC_LIVEKIT_URL` (`ws://localhost:7880`).
+- **Recording:** audio-only room-composite Egress per call to
+  `recordings/<call-id>.ogg` (Opus-in-Ogg — request OGG explicitly, filenames
+  match content), best-effort so it never breaks calls; path + status exposed
+  in `GET /calls/{id}` as `recording`. Verified: multi-MB files from real calls.
+- Takeover and concurrency demos deliberately skipped (first touches the live
+  audio path, second needs 3 live audio sources to demo).
+
+Remaining production direction: stronger compliance judge + eval set; Postgres +
+auth; worker pool; TURN/TLS + real domain for remote clients; latency attack
+order: model choice first, then endpointing tuning.
