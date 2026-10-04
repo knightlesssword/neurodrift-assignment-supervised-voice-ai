@@ -46,6 +46,10 @@ export default function Supervise() {
       room.on(RoomEvent.Disconnected, () => { setStatus('left'); setJoined(false); });
       await room.connect(tok.url, tok.token);
       // Deliberately publish nothing: no mic, no tracks.
+      try {
+        // Same autoplay unlock as the customer page (Safari stays silent without it).
+        await room.startAudio();
+      } catch (e) { setError('audio playback blocked by browser: ' + e); }
       setJoined(true);
       setStatus(`listening to ${tok.room} (hidden, publishing nothing)`);
     } catch (e) { setError(String(e)); setStatus('error'); }

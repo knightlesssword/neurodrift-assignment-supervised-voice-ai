@@ -46,6 +46,11 @@ export default function Call() {
       room.on(RoomEvent.Disconnected, () => setStatus(s => s.startsWith('ended') ? s : 'disconnected'));
       await room.connect(call.url, call.token);
       await room.localParticipant.setMicrophoneEnabled(true);
+      try {
+        // Safari/Chrome block audio playback until unlocked in a user gesture.
+        // The Call click is that gesture — without this, remote audio stays silent.
+        await room.startAudio();
+      } catch (e) { setError('audio playback blocked by browser: ' + e); }
       setInCall(true);
       setStatus(`in call ${call.call_id} — talk now`);
     } catch (e) { setError(String(e)); setStatus('error'); }
