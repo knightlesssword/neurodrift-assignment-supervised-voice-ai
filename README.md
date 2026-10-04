@@ -25,11 +25,13 @@ runs — no invented numbers, ports, or features.
 ## 2. Architecture
 
 ```
-browser (customer.html) ──WebRTC audio + data──┐
-browser (supervisor.html) ─data whisper/listens ┼─► LiveKit 1.8.4 (docker)
-FastAPI backend :8000 ──tokens/dispatch/compliance──┘         ▲
-   │ SQLite ./data/app.db (agents/calls/transcript/latency/compliance)  │ job
-   └─ agent worker (support-agent): Deepgram STT/TTS ─ Ollama LLM ─ Silero VAD
+browser (React :5173 + plain :8000/) ──WebRTC audio + data──┐
+supervisor view ──whisper / hidden listen ───────────────────┼─► LiveKit 1.8.4 (docker)
+FastAPI :8000 ──tokens/dispatch/compliance/recordings ───────┘         ▲
+   │ SQLite ./data (agents/calls/transcript/latency/compliance)        │ job
+   ├─ agent worker (support-agent): Deepgram STT/TTS ─ Ollama LLM ─ Silero VAD
+   └─ egress worker ──► recordings/<call>.ogg (audio-only room composite)
+         (Redis job queue shared by server + egress; Ollama native on Mac)
 ```
 
 - Backend owns API, tokens, dispatch, compliance, pages. It never touches audio.
@@ -47,13 +49,13 @@ Prereqs: Docker Desktop, Python 3.11, Ollama.app (or any Ollama on :11434).
 ```bash
 git clone <repo> && cd <repo>
 cp .env.example .env   # fill DEEPGRAM_API_KEY; keep secrets out of git
-docker compose up -d livekit            # self-hosted server (Part A)
-ollama pull llama3.2:3b                 # local LLM (CPU-friendly)
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-set -a; . ./.env; set +a
-.venv/bin/uvicorn backend.app.main:app --port 8000   # API + pages
-.venv/bin/python agent/worker.py dev                 # registers support-agent
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt  # tests + host mode
+docker compose up -d             # LiveKit + Redis + backend + worker + Egress
+ollama pull llama3.2:3b          # local LLM (native Ollama.app, not containerised)
 ```
+Host-mode alternative (same stack without compose): `docker compose up -d livekit`
+plus `.venv/bin/uvicorn backend.app.main:app --port 8000` and
+`.venv/bin/python agent/worker.py dev` with `LIVEKIT_URL=ws://localhost:7880`.
 
 Demo: `POST /agents` (Swagger at http://localhost:8000/docs), open
 http://localhost:8000/ (customer, allow mic) → Call; second tab
@@ -73,9 +75,13 @@ in its first message only, that the call is being recorded.
 | `50000–50010/udp` | WebRTC media: SRTP/SRTCP Opus audio, ICE host/srflx candidates (narrowed from the 50000–50100 default; ~5 concurrent calls). |
 | `3478/udp` | Embedded TURN/UDP relay (+STUN). Required on Docker Desktop: container IPs (172.x) are unroutable from the host, so direct host candidates fail; relay via the signal host works. |
 
-`livekit.yaml` also sets `rtc.node_ip: 127.0.0.1` + `enable_loopback_candidate`:
-the demo runs entirely on one Mac, so the server advertises loopback host
-candidates routed via the published UDP mapping. (An earlier `LIVEKIT_NODE_IP`
+`livekit.yaml` sets `rtc.node_ip` to the Mac LAN IP (re-check with
+`ipconfig getifaddr en0` after network changes) + `enable_loopback_candidate`:
+container IPs (172.x) are unroutable from the host, so the server must advertise
+an address reachable via the published UDP mapping — and the same address must
+work from inside compose containers (bridge gateway), which is why loopback
+alone was insufficient (egress recorder resolves 127.0.0.1 to itself).
+(An earlier `LIVEKIT_NODE_IP`
 env was removed — it is not a real LiveKit variable.) No LiveKit Cloud anywhere:
 API key/secret are ours (`devkey` + 32+-char secret in `livekit.yaml`/`.env`).
 
@@ -133,8 +139,9 @@ STT grows with utterance length (endpointing). Biggest lever: LLM/TTS choice.
   scoped but deferred per owner decision: dedicated `coturn` sidecar with
   `external-ip` NAT mapping + `rtc.turn_servers` advertisement (verified
   container→host hairpin works; needs ~12 published ports + 2 LAN-IP spots).
-- Takeover and concurrency demos deliberately skipped (first touches the live
-  audio path, second needs 3 live audio sources to demo).
+- Takeover (supervisor speaks directly, agent silent, hand back) is implemented
+  and under test on branch `feat/supervisor-takeover`; concurrency demo
+  deliberately skipped (needs 3 live audio sources to demo).
 
 Remaining production direction: stronger compliance judge + eval set; Postgres +
 auth; worker pool; TURN/TLS + real domain for remote clients; latency attack

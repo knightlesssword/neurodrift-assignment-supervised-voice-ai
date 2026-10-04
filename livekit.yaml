@@ -6,11 +6,11 @@ rtc:
   port_range_start: 50000
   port_range_end: 50010
   use_external_ip: false
-  # Advertise loopback in host candidates: the demo runs entirely on this Mac,
-  # and Docker Desktop does not route container IPs (172.x) to the host.
-  # Media to 127.0.0.1:5000x hits the published port mapping into the container.
-  # Reachable from browsers (via published UDP port mapping) and from
-  # compose containers (via bridge gateway). NOTE: Mac LAN IP, changes networks.
+  # Advertised host-candidate IP. Must be reachable from browsers (via the
+  # published UDP port mapping) and from compose containers (bridge gateway).
+  # NOTE: Mac LAN IP — re-check with `ipconfig getifaddr en0` after network
+  # changes. (Loopback was tried first for browsers, but in-container clients
+  # such as the egress recorder resolve 127.0.0.1 to themselves.)
   node_ip: 10.125.170.205
   enable_loopback_candidate: true
 room:
