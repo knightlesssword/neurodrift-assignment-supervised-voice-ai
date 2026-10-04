@@ -83,3 +83,15 @@ def test_delete_agent_blocked_by_live_call():
     assert client.delete(f"/agents/{aid}").status_code == 204
     # ended-call history still readable (no join on agents)
     assert client.get(f"/calls/{cid}").status_code == 200
+
+
+def test_recordings_lifecycle():
+    aid = client.post("/agents", json=AGENT).json()["id"]
+    cid = client.post("/calls", json={"agent_id": aid}).json()["call_id"]
+    g = client.get(f"/calls/{cid}").json()
+    assert g["recording"] is not None and g["recording"]["filepath"].endswith(".mp3")
+    assert g["recording"]["status"] in ("recording", "unavailable")
+    r = client.post(f"/calls/{cid}/end")
+    assert r.status_code == 200
+    g2 = client.get(f"/calls/{cid}").json()
+    assert g2["recording"]["status"] in ("stopped", "stop-failed", "unavailable")

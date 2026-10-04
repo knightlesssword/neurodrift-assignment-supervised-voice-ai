@@ -1,0 +1,9 @@
+# Egress worker config (stretch: local recording). Secrets mirror livekit.yaml
+# (local PoC only — same self-hosted dev key, never production credentials).
+log_level: debug
+api_key: devkey
+api_secret: devsecret-change-me-0123456789abcdef-LOCALONLY
+ws_url: ws://livekit:7880
+insecure: true
+redis:
+  address: redis:6379

@@ -1,4 +1,5 @@
 """FastAPI backend (Part C). 4 required endpoints + list/end helpers."""
+import asyncio
 import os
 import time
 import uuid
@@ -9,6 +10,7 @@ from fastapi.responses import FileResponse
 from . import db
 from . import compliance as comp
 from . import dispatch as disp
+from . import egress as egr
 from . import livekit_tokens as tok
 from .schemas import AgentCreate, CallCreate
 
@@ -117,6 +119,18 @@ async def start_call(body: CallCreate):
         conn.close()
     # Explicit dispatch: registered support-agent worker joins this room (dispatch model).
     dispatched = await disp.dispatch_agent(room, call_id)
+    # Best-effort recording (stretch): never fail the call if egress is down.
+    egress_id = await egr.start_recording(room, call_id)
+    conn = db.get_conn()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO recordings (call_id,egress_id,filepath,status) VALUES (?,?,?,?)",
+            (call_id, egress_id, f"recordings/{call_id}.mp3",
+             "recording" if egress_id else "unavailable"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     try:
         token = tok.mint_token(room, f"customer-{call_id}")
     except RuntimeError as exc:
@@ -159,6 +173,7 @@ def get_call(call_id: str):
             "SELECT turn,stt_ms,llm_ms,tts_ms,publish_ms FROM latency_turns WHERE call_id=? ORDER BY turn",
             (call_id,),
         ).fetchall()
+        rec = conn.execute("SELECT * FROM recordings WHERE call_id=?", (call_id,)).fetchone()
     finally:
         conn.close()
     return {
@@ -169,17 +184,23 @@ def get_call(call_id: str):
         "transcript": [{"ts": r["ts"], "speaker": r["speaker"], "text": r["text"]} for r in t],
         "compliance": dict(comp_row) if comp_row else None,
         "latency": [dict(r) for r in lat],
+        "recording": dict(rec) if rec else None,
     }
 
 
 @app.post("/calls/{call_id}/end")
 def end_call(call_id: str):
-    """End a call: freeze transcript, run both compliance checks, persist results."""
+    """End a call: stop recording, freeze transcript, run compliance, persist."""
     conn = db.get_conn()
     try:
         c = conn.execute("SELECT * FROM calls WHERE id=?", (call_id,)).fetchone()
         if not c:
             raise HTTPException(404, f"call {call_id} not found")
+        rec = conn.execute("SELECT * FROM recordings WHERE call_id=?", (call_id,)).fetchone()
+        stopped = asyncio.run(egr.stop_recording(rec["egress_id"] if rec else None))
+        if rec and rec["egress_id"]:
+            conn.execute("UPDATE recordings SET status=? WHERE call_id=?",
+                         ("stopped" if stopped else "stop-failed", call_id))
         entries = conn.execute(
             "SELECT ts,speaker,text FROM transcript_entries WHERE call_id=? ORDER BY ts", (call_id,)
         ).fetchall()

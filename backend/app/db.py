@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS compliance_results (
   refund_offending_line TEXT,
   refund_error TEXT
 );
+CREATE TABLE IF NOT EXISTS recordings (
+  call_id TEXT PRIMARY KEY REFERENCES calls(id),
+  egress_id TEXT,
+  filepath TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'recording'
+);
 """
 
 

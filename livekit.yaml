@@ -9,13 +9,18 @@ rtc:
   # Advertise loopback in host candidates: the demo runs entirely on this Mac,
   # and Docker Desktop does not route container IPs (172.x) to the host.
   # Media to 127.0.0.1:5000x hits the published port mapping into the container.
-  node_ip: 127.0.0.1
+  # Reachable from browsers (via published UDP port mapping) and from
+  # compose containers (via bridge gateway). NOTE: Mac LAN IP, changes networks.
+  node_ip: 10.125.170.205
   enable_loopback_candidate: true
 room:
   empty_timeout: 300
   departure_timeout: 20
 keys:
   devkey: devsecret-change-me-0123456789abcdef-LOCALONLY
+# Shared Redis so the egress worker receives jobs from this server.
+redis:
+  address: redis:6379
 turn:
   # Embedded TURN/UDP relay (also STUN). Browser/probes reach it via the
   # published 3478/udp on the API host, so relay candidates work even though

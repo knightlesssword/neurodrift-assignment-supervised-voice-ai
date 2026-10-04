@@ -12,3 +12,4 @@ venv/
 .DS_Store
 # Node (if ever added)
 node_modules/
+*.mp3
