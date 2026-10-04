@@ -16,5 +16,44 @@ services:
       - "3478:3478/udp"
     # NB: node advertisement is set via rtc.node_ip in livekit.yaml.
     # (LIVEKIT_NODE_IP is not a real LiveKit env var — see config.go flag names.)
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    environment:
+      # Inside the compose network, LiveKit is reachable by service name;
+      # Ollama stays native on the Mac (host.docker.internal from containers).
+      LIVEKIT_URL: ws://livekit:7880
+      OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
+      DATABASE_URL: sqlite:////data/app.db
+    volumes:
+      # Shared SQLite file (WAL mode): backend + worker on the same host file.
+      - ./data:/data
+    ports:
+      # 8000/tcp: FastAPI (agents/calls API, Swagger, plain-JS pages).
+      - "8000:8000"
+    depends_on:
+      - livekit
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # Production mode (not dev): registers support-agent, takes dispatches.
+    command: python agent/worker.py start
+    env_file: .env
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
+      DATABASE_URL: sqlite:////data/app.db
+      BACKEND_URL: http://backend:8000
+    volumes:
+      - ./data:/data
+    depends_on:
+      - livekit
+      - backend
+    restart: unless-stopped
 # NOTE: Ollama runs natively (Ollama.app) on 11434 — no container here
-# to avoid port clash. Backend uses OPENROUTER_* when set, else OLLAMA_*.
+# to avoid port clash. LLM = Ollama only (no OpenRouter code).
