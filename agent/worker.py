@@ -172,7 +172,8 @@ async def entrypoint(ctx: JobContext):
         use_tts_aligned_transcript=True,
     )
     agent = Agent(instructions=cfg["system_prompt"])
-    turns = {"n": 0, "speaking_at": None, "user_m": {}, "asst_m": {}, "asst_created": None}
+    turns = {"n": 0, "speaking_at": None, "user_m": {}, "asst_m": {}, "asst_created": None,
+             "pending_whisper": None}
 
     async def publish(speaker: str, text: str):
         ts = time.time()
@@ -185,15 +186,18 @@ async def entrypoint(ctx: JobContext):
 
     def on_data(packet: rtc.DataPacket):
         try:
-            log.debug("data received topic=%r from=%s", packet.topic,
-                      getattr(packet.participant, "identity", None))
+            sender = getattr(packet.participant, "identity", None)
+            log.debug("data received topic=%r from=%s", packet.topic, sender)
             if packet.topic != TOPIC_WHISPER:
                 return
             guidance = packet.data.decode().strip()
             if not guidance:
                 return
+            log.info("whisper received from=%s text=%r (%d chars) -> inserting into LLM history",
+                     sender, guidance[:200], len(guidance))
             session.history.insert(guidance_message(guidance))
-            log.info("whisper stored (%d chars), applies to next reply", len(guidance))
+            turns["pending_whisper"] = guidance[:200]
+            log.info("whisper stored (%d chars), applies to next LLM reply", len(guidance))
         except Exception as exc:
             log.warning("whisper handling failed: %s", exc)
 
@@ -236,6 +240,10 @@ async def entrypoint(ctx: JobContext):
         else:
             turns["asst_m"] = dict(item.metrics or {})
             turns["asst_created"] = item.created_at
+            if turns.get("pending_whisper"):
+                log.info("LLM reply after whisper=%r -> agent says=%r",
+                         turns["pending_whisper"], text[:200])
+                turns["pending_whisper"] = None
             asyncio.get_event_loop().create_task(publish("agent", text))
             stages = latency_ms_from_metrics(turns["user_m"], turns["asst_m"])
             stages["publish_ms"] = publish_stage_ms(
