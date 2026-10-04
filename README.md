@@ -127,6 +127,12 @@ STT grows with utterance length (endpointing). Biggest lever: LLM/TTS choice.
   `recordings/<call-id>.ogg` (Opus-in-Ogg — request OGG explicitly, filenames
   match content), best-effort so it never breaks calls; path + status exposed
   in `GET /calls/{id}` as `recording`. Verified: multi-MB files from real calls.
+  Known flake: on Docker Desktop the egress recorder's own peer connection
+  sometimes never establishes (container-networking ICE) and the job aborts
+  with no file — documented, not silent (`stop-failed` in API). Reliable fix
+  scoped but deferred per owner decision: dedicated `coturn` sidecar with
+  `external-ip` NAT mapping + `rtc.turn_servers` advertisement (verified
+  container→host hairpin works; needs ~12 published ports + 2 LAN-IP spots).
 - Takeover and concurrency demos deliberately skipped (first touches the live
   audio path, second needs 3 live audio sources to demo).
 

@@ -16,5 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
 COPY agent ./agent
+COPY web ./web
 
 EXPOSE 8000
